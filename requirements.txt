@@ -1,0 +1,11 @@
+pandas
+boto3
+google-generativeai
+openai
+python-dotenv
+streamlit>=1.28.0
+google-adk
+pydantic
+mysql-connector-python
+sqlalchemy
+mysql
