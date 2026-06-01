@@ -1,6 +1,6 @@
 from google.adk.tools import ToolContext
 
-def save_generated_sql(user_prompt: str, sql_query: str, tool_context: ToolContext) -> str:
+def save_generated_sql(user_prompt: str, sql_query: str, explanation: str, tables_used: list, tool_context: ToolContext) -> str:
     """
     Tool: Saves the user's original prompt and the generated SQL query into the context state.
     This allows the reviewer agent to access them.
@@ -14,11 +14,15 @@ def save_generated_sql(user_prompt: str, sql_query: str, tool_context: ToolConte
     try:
         tool_context.state["user_prompt"] = user_prompt
         tool_context.state["generated_sql"] = sql_query
+        tool_context.state["explanation"] = explanation
+        tool_context.state["tables_used"] = tables_used
     except TypeError:
         # If it doesn't support assignment, try updating its dict representation
         if hasattr(tool_context.state, '__dict__'):
              tool_context.state.__dict__["user_prompt"] = user_prompt
              tool_context.state.__dict__["generated_sql"] = sql_query
+             tool_context.state.__dict__["explanation"] = explanation
+             tool_context.state.__dict__["tables_used"] = tables_used
     
     return "Successfully saved user prompt and SQL query to state."
 

@@ -83,13 +83,20 @@ async def async_main():
             state_dict = session.state if isinstance(session.state, dict) else session.state.to_dict()
             
             generated_sql = state_dict.get("generated_sql", "No SQL generated.")
+            explanation = state_dict.get("explanation", "")
+            tables_used = state_dict.get("tables_used", [])
             review_feedback = state_dict.get("review_feedback", "No review feedback available.")
+            
+            final_output = {
+                "sql_query": generated_sql,
+                "explanation": explanation,
+                "tables_used": tables_used,
+                "review_feedback": review_feedback
+            }
             
             print(f"✅ Final Result:")
             print("-" * 60)
-            print(f"**Generated SQL:**\n{generated_sql}")
-            print("-" * 60)
-            print(f"**Review Feedback:**\n{review_feedback}")
+            print(json.dumps(final_output, indent=2))
             print("=" * 60)
             
         except KeyboardInterrupt:

@@ -7,7 +7,7 @@ from tools.db_tools import (
     execute_generated_sql
 )
 from tools.state_tools import save_generated_sql
-from agents.schemas import SQLQueryGeneratorInput
+from agents.schemas import SQLQueryGeneratorInput, SQLQueryGeneratorOutput
 
 MODEL_NAME = "gemini-2.5-flash"
 
@@ -35,7 +35,7 @@ Your Process:
 5. GET VALUE EXAMPLES: Use get_distinct_values() to understand data in filter columns
 6. BUILD THE QUERY: Construct the SQL query based on your understanding
 7. TEST QUERY: Use execute_generated_sql() to test your query and ensure it returns valid results without errors. Fix it if it fails.
-8. SAVE TO STATE: You MUST use the save_generated_sql() tool to save the user's original prompt and your successfully generated SQL query to the context state.
+8. SAVE TO STATE: You MUST use the save_generated_sql() tool to save the user's original prompt, your successfully generated SQL query, explanation, and tables_used to the context state.
 9. EXPLAIN: Describe which tables you used and why
 
 Important Principles:
@@ -45,7 +45,7 @@ Important Principles:
 - Include appropriate WHERE clauses for filtering
 
 Response Format:
-Return a clear SQL query with explanation. Ensure you have called save_generated_sql() before finishing.
+Return ONLY a JSON object that satisfies the provided schema containing 'sql_query', 'explanation', and 'tables_used'. Ensure you have called save_generated_sql(user_prompt, sql_query, explanation, tables_used) before finishing. Do not output markdown code blocks.
 """,
     
     tools=[
@@ -58,5 +58,6 @@ Return a clear SQL query with explanation. Ensure you have called save_generated
     ],
     
     input_schema=SQLQueryGeneratorInput,
+    output_schema=SQLQueryGeneratorOutput,
     output_key="sql_query_output",
 )
