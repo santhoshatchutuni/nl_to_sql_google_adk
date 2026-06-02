@@ -9,3 +9,5 @@ pydantic
 mysql-connector-python
 sqlalchemy
 mysql
+litellm
+ipykernel
