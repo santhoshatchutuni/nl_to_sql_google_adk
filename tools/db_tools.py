@@ -1,4 +1,6 @@
 from utils.db_utils import DatabaseConnector, MYSQL_CONFIG
+from google.adk.tools import ToolContext
+import json
 
 def get_database_schema() -> str:
     """
@@ -185,6 +187,42 @@ def execute_generated_sql(sql_query: str) -> str:
                 
             if len(results) > 20:
                 output += f"\n... and {len(results) - 20} more rows."
+                
+        return output
+    except Exception as e:
+        return f"Error executing query: {str(e)}"
+
+def execute_approved_query(tool_context: ToolContext) -> str:
+    """
+    Tool: Execute the approved SQL query stored in the state against the database 
+    and return the results.
+    """
+    state_dict = tool_context.state if isinstance(tool_context.state, dict) else tool_context.state.to_dict()
+    sql_query = state_dict.get("generated_sql")
+    
+    if not sql_query:
+        return "Error: No approved SQL query found in state."
+        
+    try:
+        results = DatabaseConnector.execute_query(sql_query)
+        if not results:
+            return "Query executed successfully, but returned no results."
+            
+        # Format output
+        output = f"Raw Query Results (showing up to 50 rows):\n"
+        output += "-"*60 + "\n"
+        
+        # Determine column headers from first row
+        if len(results) > 0:
+            headers = list(results[0].keys())
+            output += " | ".join(headers) + "\n"
+            output += "-"*60 + "\n"
+            
+            for i, row in enumerate(results[:50]):
+                output += " | ".join([str(row[h]) for h in headers]) + "\n"
+                
+            if len(results) > 50:
+                output += f"\n... and {len(results) - 50} more rows."
                 
         return output
     except Exception as e:

@@ -46,3 +46,24 @@ def save_review_feedback(feedback: str, tool_context: ToolContext) -> str:
              tool_context.state.__dict__["review_feedback"] = feedback
              
     return "Successfully saved review feedback to state."
+
+def get_user_request(tool_context: ToolContext) -> str:
+    """
+    Tool: Retrieves the original user prompt from the context state.
+    This helps the data interpreter know what question to answer with the executed data.
+    """
+    state_dict = tool_context.state if isinstance(tool_context.state, dict) else tool_context.state.to_dict()
+    prompt = state_dict.get("user_prompt", "No user prompt found in state.")
+    return f"Original User Question: {prompt}"
+
+def save_final_answer(answer: str, tool_context: ToolContext) -> str:
+    """
+    Tool: Saves the final natural language answer into the context state so the main script can display it.
+    """
+    try:
+        tool_context.state["final_answer"] = answer
+    except TypeError:
+        if hasattr(tool_context.state, '__dict__'):
+             tool_context.state.__dict__["final_answer"] = answer
+             
+    return "Successfully saved the final answer to state."

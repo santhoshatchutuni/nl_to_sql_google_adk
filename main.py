@@ -87,16 +87,26 @@ async def async_main():
             tables_used = state_dict.get("tables_used", [])
             review_feedback = state_dict.get("review_feedback", "No review feedback available.")
             
+            # Since ADK session might not expose a flat 'history' array easily, 
+            # let's save the final natural language answer into the state dictionary 
+            # within the DataInterpreterAgent tool itself. 
+            # Let's temporarily retrieve it if it exists.
+            final_answer = state_dict.get("final_answer", "Final answer not saved to state.")
+            
             final_output = {
                 "sql_query": generated_sql,
                 "explanation": explanation,
                 "tables_used": tables_used,
-                "review_feedback": review_feedback
+                "review_feedback": review_feedback,
             }
             
             print(f"✅ Final Result:")
             print("-" * 60)
             print(json.dumps(final_output, indent=2))
+            
+            print("\n📊 Data Interpreter Answer:")
+            print("-" * 60)
+            print(final_answer)
             print("=" * 60)
             
         except KeyboardInterrupt:
