@@ -79,6 +79,8 @@ async def async_main():
                 user_id=user_id,
                 session_id=session_id
             )
+
+           
             
             state_dict = session.state if isinstance(session.state, dict) else session.state.to_dict()
             
@@ -108,6 +110,7 @@ async def async_main():
             print("-" * 60)
             print(final_answer)
             print("=" * 60)
+            #print(session.events[-1].content.parts[0].text if session.events else "No events found in session.")
             
         except KeyboardInterrupt:
             print("\nGoodbye!")
