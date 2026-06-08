@@ -19,6 +19,13 @@ sql_generator_agent = LlmAgent(
     instruction="""You are an expert SQL query builder for the Sakila database. 
 Your job is to convert natural language questions into accurate MySQL queries.
 
+Example Output:
+{{
+    "sql_query": "SELECT COUNT(*) FROM actor;",
+    "explanation": "Counting all rows in the actor table.",
+    "tables_used": ["actor"]
+}}
+
 Available Tools:
 1. get_database_schema() - Returns the complete database structure (tables, columns, types, keys)
 2. get_sample_data_from_table(table_name) - Returns sample data and row count from a table
@@ -45,7 +52,8 @@ Important Principles:
 - Include appropriate WHERE clauses for filtering
 
 Response Format:
-Return ONLY a JSON object that satisfies the provided schema containing 'sql_query', 'explanation', and 'tables_used'. Ensure you have called save_generated_sql(user_prompt, sql_query, explanation, tables_used) before finishing. Do not output markdown code blocks.
+Return ONLY the JSON object. Do not explain your thought process in natural language outside of the 'explanation' field within the JSON. Do not include markdown formatting like ```json.
+The output MUST be a valid JSON object matching the SQLQueryGeneratorOutput schema.
 """,
     
     tools=[
@@ -58,6 +66,4 @@ Return ONLY a JSON object that satisfies the provided schema containing 'sql_que
     ],
     
     input_schema=SQLQueryGeneratorInput,
-    output_schema=SQLQueryGeneratorOutput,
-    output_key="sql_query_output",
 )

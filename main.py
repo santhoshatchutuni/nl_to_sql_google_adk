@@ -9,6 +9,10 @@ from google.genai import types
 import google.adk.models.gemini_llm_connection # required to register the gemini connection
 
 from agents import sql_orchestrator_agent
+from utils.telemetry import configure_observability
+from utils.evaluator import evaluate_sql_quality
+from tools.db_tools import get_database_schema
+from opentelemetry import trace
 
 # Load environment variables
 load_dotenv()
@@ -21,6 +25,10 @@ if not gemini_api_key:
 
 genai.configure(api_key=gemini_api_key)
 os.environ["GOOGLE_API_KEY"] = gemini_api_key
+
+# Initialize observability
+phoenix_url = configure_observability()
+print(f"👁️ Phoenix Observability running at: {phoenix_url}")
 
 APP_NAME = "sakila_nl2sql_app"
 
@@ -59,41 +67,46 @@ async def async_main():
                 
             print("\n⏳ Processing... (This involves multiple agents running sequentially)\n")
             
-            # Use Runner with the Sequential Orchestrator
-            runner = Runner(
-                agent=sql_orchestrator_agent,
-                app_name=APP_NAME,
-                session_service=session_service
-            )
-            
-            prompt = f"Please generate a SQL query for this request and then review it: {user_input}"
-            user_content = types.Content(role='user', parts=[types.Part(text=prompt)])
-            
-            # The sequential agent coordinates everything.
-            async for event in runner.run_async(user_id=user_id, session_id=session_id, new_message=user_content):
-                pass
-            
-            # Retrieve the final state to show the user
-            session = await session_service.get_session(
-                app_name=APP_NAME,
-                user_id=user_id,
-                session_id=session_id
-            )
+            tracer = trace.get_tracer(__name__)
+            with tracer.start_as_current_span("agent_request") as parent_span:
+                parent_span.set_attribute("user_query", user_input)
 
-           
-            
-            state_dict = session.state if isinstance(session.state, dict) else session.state.to_dict()
-            
-            generated_sql = state_dict.get("generated_sql", "No SQL generated.")
-            explanation = state_dict.get("explanation", "")
-            tables_used = state_dict.get("tables_used", [])
-            review_feedback = state_dict.get("review_feedback", "No review feedback available.")
-            
-            # Since ADK session might not expose a flat 'history' array easily, 
-            # let's save the final natural language answer into the state dictionary 
-            # within the DataInterpreterAgent tool itself. 
-            # Let's temporarily retrieve it if it exists.
-            final_answer = state_dict.get("final_answer", "Final answer not saved to state.")
+                # Use Runner with the Sequential Orchestrator
+                runner = Runner(
+                    agent=sql_orchestrator_agent,
+                    app_name=APP_NAME,
+                    session_service=session_service
+                )
+                
+                prompt = f"Please generate a SQL query for this request and then review it: {user_input}"
+                user_content = types.Content(role='user', parts=[types.Part(text=prompt)])
+                
+                # The sequential agent coordinates everything.
+                async for event in runner.run_async(user_id=user_id, session_id=session_id, new_message=user_content):
+                    pass
+                
+                # Retrieve the final state to show the user
+                session = await session_service.get_session(
+                    app_name=APP_NAME,
+                    user_id=user_id,
+                    session_id=session_id
+                )
+
+                state_dict = session.state if isinstance(session.state, dict) else session.state.to_dict()
+                
+                generated_sql = state_dict.get("generated_sql", "No SQL generated.")
+                explanation = state_dict.get("explanation", "")
+                tables_used = state_dict.get("tables_used", [])
+                review_feedback = state_dict.get("review_feedback", "No review feedback available.")
+                final_answer = state_dict.get("final_answer", "Final answer not saved to state.")
+                
+                # --- Start of Evaluation ---
+                print("\n⚖️  Running LLM-as-a-Judge Evaluation...")
+                schema = get_database_schema()
+                eval_results = await evaluate_sql_quality(user_input, generated_sql, schema)
+                print(f"   Score: {eval_results['score']} / 1.0")
+                print(f"   Reason: {eval_results['reason']}")
+                # --- End of Evaluation ---
             
             final_output = {
                 "sql_query": generated_sql,
@@ -109,6 +122,7 @@ async def async_main():
             print("\n📊 Data Interpreter Answer:")
             print("-" * 60)
             print(final_answer)
+            
             print("=" * 60)
             #print(session.events[-1].content.parts[0].text if session.events else "No events found in session.")
             

@@ -11,3 +11,8 @@ sqlalchemy
 mysql
 litellm
 ipykernel
+arize-phoenix
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-exporter-otlp
+openinference-instrumentation-google-genai # For automatic LLM tracking

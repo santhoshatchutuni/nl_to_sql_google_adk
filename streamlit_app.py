@@ -13,6 +13,10 @@ from google.genai import types
 import google.adk.models.gemini_llm_connection # Registers the Gemini connection
 
 from agents import sql_orchestrator_agent
+from utils.telemetry import configure_observability
+from utils.evaluator import evaluate_sql_quality
+from tools.db_tools import get_database_schema
+from opentelemetry import trace
 
 # ---------------------------------------------------------
 # Setup & Configuration
@@ -27,6 +31,13 @@ if not gemini_api_key:
 
 genai.configure(api_key=gemini_api_key)
 os.environ["GOOGLE_API_KEY"] = gemini_api_key
+
+# Initialize observability ONCE for the Streamlit server
+@st.cache_resource
+def init_telemetry():
+    return configure_observability()
+
+phoenix_url = init_telemetry()
 
 APP_NAME = "sakila_nl2sql_app"
 USER_ID = "streamlit_user"
@@ -62,35 +73,47 @@ async def process_user_query(user_input: str):
     except Exception:
         pass # Session already exists
         
-    runner = Runner(
-        agent=sql_orchestrator_agent,
-        app_name=APP_NAME,
-        session_service=service
-    )
-    
-    # We pass the user's input as the new message
-    prompt = f"Please generate a SQL query for this request and then review it: {user_input}"
-    user_content = types.Content(role='user', parts=[types.Part(text=prompt)])
-    
-    # Run the agent chain
-    async for event in runner.run_async(user_id=USER_ID, session_id=session_id, new_message=user_content):
-        pass
+    tracer = trace.get_tracer(__name__)
+    with tracer.start_as_current_span("agent_request") as parent_span:
+        parent_span.set_attribute("user_query", user_input)
         
-    # Retrieve the final state
-    session = await service.get_session(
-        app_name=APP_NAME,
-        user_id=USER_ID,
-        session_id=session_id
-    )
-    
-    state_dict = session.state if isinstance(session.state, dict) else session.state.to_dict()
+        runner = Runner(
+            agent=sql_orchestrator_agent,
+            app_name=APP_NAME,
+            session_service=service
+        )
+        
+        # We pass the user's input as the new message
+        prompt = f"Please generate a SQL query for this request and then review it: {user_input}"
+        user_content = types.Content(role='user', parts=[types.Part(text=prompt)])
+        
+        # Run the agent chain
+        async for event in runner.run_async(user_id=USER_ID, session_id=session_id, new_message=user_content):
+            pass
+            
+        # Retrieve the final state
+        session = await service.get_session(
+            app_name=APP_NAME,
+            user_id=USER_ID,
+            session_id=session_id
+        )
+        
+        state_dict = session.state if isinstance(session.state, dict) else session.state.to_dict()
+        generated_sql = state_dict.get("generated_sql", "")
+
+        # --- Start of Evaluation ---
+        schema = get_database_schema()
+        eval_details = await evaluate_sql_quality(user_input, generated_sql, schema)
+        # --- End of Evaluation ---
     
     return {
-        "sql_query": state_dict.get("generated_sql", "No SQL generated."),
+        "sql_query": generated_sql,
         "explanation": state_dict.get("explanation", ""),
         "tables_used": state_dict.get("tables_used", []),
         "review_feedback": state_dict.get("review_feedback", "No review feedback available."),
-        "final_answer": state_dict.get("final_answer", "Data Interpreter did not save an answer.")
+        "final_answer": state_dict.get("final_answer", "Data Interpreter did not save an answer."),
+        "eval_score": eval_details.get("score", 0.0),
+        "eval_reason": eval_details.get("reason", "")
     }
 
 # ---------------------------------------------------------
@@ -136,7 +159,9 @@ def main():
                         "SQL Query": result["sql_query"],
                         "Explanation": result["explanation"],
                         "Tables Used": result["tables_used"],
-                        "Review Feedback": result["review_feedback"]
+                        "Review Feedback": result["review_feedback"],
+                        "LLM Judge Score": f"{result['eval_score']} / 1.0",
+                        "Judge Reason": result["eval_reason"]
                     }
                     with st.expander("🛠️ View Agent Details (SQL, Review, etc.)"):
                         st.json(details)

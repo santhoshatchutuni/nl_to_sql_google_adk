@@ -1,0 +1,18 @@
+[
+    {
+        "input": "How many actors are in the database?",
+        "expected_output": "SELECT COUNT(*) FROM actor;"
+    },
+    {
+        "input": "List the first 5 films in the database.",
+        "expected_output": "SELECT title FROM film LIMIT 5;"
+    },
+    {
+        "input": "Who is the actor with the first name 'NICK'?",
+        "expected_output": "SELECT * FROM actor WHERE first_name = 'NICK';"
+    },
+    {
+        "input": "Show me all the categories of films.",
+        "expected_output": "SELECT name FROM category;"
+    }
+]
